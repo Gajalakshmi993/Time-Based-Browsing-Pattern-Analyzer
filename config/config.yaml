@@ -1,0 +1,108 @@
+# ============================================================
+# Browsing Pattern Analyzer — Central Configuration
+# ============================================================
+
+project:
+  name: "Time-Based Browsing Pattern Analyzer"
+  version: "1.0.0"
+  author: "learner"
+
+# ── Data Paths ───────────────────────────────────────────────
+paths:
+  raw_browsing:   "data/raw/browsing_history.csv"
+  raw_ram:        "data/raw/ram_log.csv"
+  domain_map:     "data/raw/domain_category_map.csv"
+  processed_browsing: "data/processed/browsing_clean.csv"
+  sessions:       "data/processed/sessions.csv"
+  session_features: "data/processed/session_features.csv"
+  merged_ram:     "data/processed/browsing_ram_merged.csv"
+  cluster_labels: "data/processed/cluster_labels.csv"
+  anomaly_scores: "data/processed/anomaly_scores.csv"
+  report_out:     "reports/final_report.md"
+
+# ── Browser / Collection ─────────────────────────────────────
+collection:
+  browser: "chrome"                  # chrome | edge
+  # Chrome default history DB path (auto-detected on each OS)
+  chrome_history_paths:
+    linux:   "~/.config/google-chrome/Default/History"
+    mac:     "~/Library/Application Support/Google/Chrome/Default/History"
+    windows: "%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\History"
+  edge_history_paths:
+    linux:   "~/.config/microsoft-edge/Default/History"
+    mac:     "~/Library/Application Support/Microsoft Edge/Default/History"
+    windows: "%LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\History"
+  time_window_days: 5                # 3 | 4 | 5 — selectable at runtime
+  ram_poll_interval_sec: 10          # how often RAM logger samples
+
+# ── Preprocessing ────────────────────────────────────────────
+preprocessing:
+  remove_query_strings: true
+  remove_paths: false                # keep paths for domain extraction only
+  min_url_length: 10
+  deduplicate: true
+  timezone: "Asia/Kolkata"           # convert UTC → local
+
+# ── Sessionization ───────────────────────────────────────────
+sessionization:
+  gap_minutes: 15                    # inactivity gap → new session
+  min_events_per_session: 2          # drop single-event ghost sessions
+
+# ── Feature Engineering ──────────────────────────────────────
+features:
+  time_windows: [3, 4, 5]           # days available for analysis
+  hourly_bins: 24
+  day_parts:                         # label mapping for hours
+    morning:    [6,  11]
+    afternoon:  [12, 16]
+    evening:    [17, 21]
+    night:      [22, 23]
+    late_night: [0,   5]
+
+# ── Clustering ───────────────────────────────────────────────
+clustering:
+  algorithm: "kmeans"                # kmeans | gmm | dbscan
+  n_clusters: 4                      # for kmeans / gmm
+  random_state: 42
+  dbscan_eps: 0.5
+  dbscan_min_samples: 3
+  scale_features: true
+
+# ── Deep Learning ────────────────────────────────────────────
+deep_learning:
+  mode: "autoencoder"                # lstm | autoencoder
+  # LSTM settings
+  lstm:
+    sequence_length: 10
+    embedding_dim: 16
+    hidden_units: 64
+    dropout: 0.2
+    epochs: 30
+    batch_size: 32
+  # Autoencoder settings
+  autoencoder:
+    encoding_dim: 8
+    hidden_layers: [32, 16]
+    epochs: 50
+    batch_size: 32
+    anomaly_percentile: 95           # reconstruction error threshold
+
+# ── RAM Correlation ──────────────────────────────────────────
+ram:
+  merge_tolerance_sec: 30            # nearest-timestamp merge window
+  spike_threshold_mb: 200            # RAM delta that counts as a spike
+  top_n_heavy_categories: 3
+
+# ── Recommendations ──────────────────────────────────────────
+recommendations:
+  social_ratio_threshold: 0.45
+  late_night_hour_start: 22
+  heavy_ram_threshold_mb: 1500
+  min_session_duration_sec: 300
+  max_daily_social_minutes: 120
+
+# ── Dashboard ────────────────────────────────────────────────
+dashboard:
+  port: 8501
+  theme: "dark"
+  default_days: 5
