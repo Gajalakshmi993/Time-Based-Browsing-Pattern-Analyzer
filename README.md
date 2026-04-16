@@ -1,55 +1,123 @@
-Problem Statement:
-Build an AI system that analyzes a user’s browsing history for a selectable time window (last 3, 4, or 5 days) and identifies:
-Browsing patterns based on time (hour/day/session behavior)
-Dominant website categories (social/media/learning/shopping/etc.)
-Behavior clusters (types of sessions)
-Deep-learning-based predictions/anomalies (next category prediction or unusual sessions)
-Correlation between browsing behavior and RAM usage (system + browser RAM), highlighting memory-heavy patterns and giving actionable recommendations.
+# Time-Based Browsing Pattern Analyzer
 
-Business Use Cases:
-Employee productivity analytics (privacy-safe / category-level only): Identify distraction-heavy hours and recommend focus blocks.
-Digital wellbeing tools: Detect late-night social media loops and give healthier usage suggestions.
-IT performance optimization: Find websites/categories that cause high browser RAM usage and recommend tab/extension management.
-Cybersecurity behavior baselining (high-level): Detect unusual browsing sessions that deviate from typical patterns (anomaly detection).
-EdTech learner behavior insights: Understand study vs distraction sessions and recommend optimal learning schedules.
-Device performance support: Predict RAM spikes and suggest actions before slowdown occurs.
-Approach:
-Learners should implement the project in 7 modules:
-1) Data Collection
-Extract browsing history events from browser SQLite DB (Chrome/Edge history).
-Log RAM metrics periodically (every 5–10 seconds):
-system RAM used/available
-browser process RAM (Chrome/Edge total)
-Optional (bonus): active tab tracking to estimate true “time spent”.
-2) Data Preprocessing
-Clean URL → extract domain
-Remove/obfuscate sensitive URL parts (query strings)
-Map domain → category using a curated mapping table
-Convert timestamps to local time; create hour, date, day_name
-3) Sessionization (Core Step)
-Build sessions using inactivity threshold (e.g., 15 minutes gap = new session)
-For each session compute summary stats (counts, ratios, switching behavior)
+Analyzes your browser history to surface productivity insights, behavior clusters,
+RAM correlations, and anomalous sessions using unsupervised ML and deep learning.
 
+---
 
-4) RAM Correlation (Time Alignment)
-Join browsing events with RAM logs using nearest timestamp merge
-Produce RAM stats per session/category (mean, peak)
+## Quick Start
 
+```bash
+# 1. Clone / unzip project
+cd browsing_analyzer
 
-5) Pattern Discovery (Unsupervised)
-Cluster sessions or days using engineered features
-Label clusters with interpretation rules (top categories + time + RAM)
+# 2. Create virtualenv
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
+# 3. Install dependencies
+pip install -r requirements.txt
 
-6) Deep Learning (Pick at least one)
-Option A: LSTM/GRU Next-Category Prediction
-Input: category sequence per session
-Output: next category / probability of social-media next
-Option B: Autoencoder Anomaly Detection
-Input: session feature vector
-Output: anomaly score for unusual sessions (time + switching + RAM spikes)
+# 4. (Optional) Start RAM logger BEFORE your browsing session
+python -m src.collect.ram_logger --minutes 60 &
 
+# 5. Run full pipeline
+python main.py --days 5
 
-7) Recommendation Engine + Reporting
-Generate recommendations from rules + model signals
-Output report + optional dashboard
+# 6. View report
+cat reports/final_report.md
+
+# 7. (Optional) Launch dashboard
+streamlit run dashboard/app.py
+```
+
+---
+
+## Configuration
+
+All tunable parameters live in **`config/config.yaml`**:
+
+| Section | Key settings |
+|---|---|
+| `collection` | browser type, time window days, RAM poll interval |
+| `preprocessing` | timezone, deduplication, query-string removal |
+| `sessionization` | inactivity gap (default 15 min) |
+| `clustering` | algorithm (kmeans/gmm/dbscan), n_clusters |
+| `deep_learning` | mode (autoencoder/lstm), epochs, hidden sizes |
+| `recommendations` | thresholds for social ratio, late-night hours, RAM |
+
+---
+
+## Project Structure
+
+```
+browsing_analyzer/
+├── config/
+│   └── config.yaml              ← single source of truth for all params
+├── data/
+│   ├── raw/
+│   │   ├── browsing_history.csv
+│   │   ├── ram_log.csv
+│   │   └── domain_category_map.csv   ← extend with your domains
+│   └── processed/               ← auto-generated artifacts
+├── src/
+│   ├── config_loader.py
+│   ├── collect/
+│   │   ├── history_extractor.py  [Module 1a]
+│   │   └── ram_logger.py         [Module 1b]
+│   ├── prep/
+│   │   ├── preprocessor.py       [Module 2]
+│   │   └── sessionizer.py        [Module 3]
+│   ├── analytics/
+│   │   ├── ram_correlation.py    [Module 4]
+│   │   └── report_generator.py   [Module 7b]
+│   ├── models/
+│   │   ├── clustering.py         [Module 5]
+│   │   ├── autoencoder.py        [Module 6a]
+│   │   └── lstm_predictor.py     [Module 6b]
+│   └── recommend/
+│       └── engine.py             [Module 7a]
+├── dashboard/
+│   └── app.py                    ← Streamlit dashboard
+├── reports/
+│   └── final_report.md           ← auto-generated
+├── main.py                       ← full pipeline runner
+└── requirements.txt
+```
+
+---
+
+## CLI Options
+
+```bash
+python main.py --days 3            # analyze last 3 days
+python main.py --skip-collect      # skip extraction (reuse existing CSVs)
+python main.py --skip-ram          # no RAM log available
+python main.py --dl lstm           # use LSTM instead of autoencoder
+python main.py --dl none           # skip DL entirely
+python main.py --browser edge      # use Edge instead of Chrome
+```
+
+---
+
+## Privacy
+
+- Only domain names are stored, never full URLs or query strings
+- Raw browsing DB is never modified — a temporary copy is used
+- No data leaves your machine
+- Set `remove_query_strings: true` in config (default) for maximum privacy
+
+---
+
+## Extending the Domain Map
+
+Add rows to `data/raw/domain_category_map.csv`:
+
+```csv
+domain,category
+yoursite.com,work
+anothersite.com,learning
+```
+
+Categories used by the system: `social_media`, `video`, `news`, `shopping`,
+`learning`, `work`, `search`, `email`, `messaging`, `finance`, `health`, `unknown`
